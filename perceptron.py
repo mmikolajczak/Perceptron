@@ -1,40 +1,30 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import cv2
 
-# actual linear equation coefficients
-a = 2.3
-b = -0.4
-iterations = 10 ** 5#int(10e5)
-
-# eta as a learning rate should be provided
-# when to stop learning? - let's say after 10k of iterations
-# as it is for presentation the idea is to present it dynamically using matplot (maybe with help in handling
-# keyboard using opcv.
+# TODO: visualization part
 
 
-points_below_line = []
-points_above_line = []
+class LinearEquation:
+    # structure that keeps parameters of linear equation
 
-#def test_linear_function(x):
-#    return x *
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+        self.x0 = - b / a
 
 
-def generate_sample(a, b):
-    cord_x = np.random.uniform(-1000, 1000)
-    cord_y = np.random.uniform(-1000, 1000)
-    result = 1 if cord_y > a * cord_x + b else -1
-    return np.array([cord_x, cord_y, result])
-
-def generate_sample2(a, b):
-    cord_x = np.random.uniform(-100000, 100000)
-    cord_y = np.random.uniform(-100000, 100000)
-    result = 1 if cord_y > a * cord_x + b else -1
+def generate_sample(lin_eq, range_start=-1000, range_end=1000):
+    # generates sample point with x, y coordinates in specified range
+    # additionally returns proper classification for a point: 1 if it is
+    # above line specified by lin_eq parameter and -1 if it lies below
+    cord_x = np.random.uniform(range_start, range_end)
+    cord_y = np.random.uniform(range_start, range_end)
+    result = 1 if cord_y >= lin_eq.a * cord_x + lin_eq.b else -1
     return np.array([cord_x, cord_y, result])
 
 
 def draw_plot(orig_a, orig_b, pred_a, pred_b):
+    # for future visualization purposes
     plt.plot([-10, 10], [-10 * orig_a + orig_b, 10 * orig_a + orig_b], c='red')
     plt.plot([-10, 10], [-10 * pred_a + pred_b, 10 * pred_a + pred_b], c='blue')
     plt.title('Visualization test')
@@ -42,6 +32,11 @@ def draw_plot(orig_a, orig_b, pred_a, pred_b):
 
 
 class SimplePerceptron:
+    # class that implements perceptron model
+    # attributes:
+    # eta - learning rate, should be real in range <0;1>
+    # weights - weights values for each perceptron inputs
+    # bias - 'weight 0', -threshold
 
     def __init__(self, n_inputs=2, eta=0.01):
         self._weights = np.zeros(n_inputs).reshape((1, n_inputs))
@@ -49,45 +44,56 @@ class SimplePerceptron:
         self._eta = eta
 
     def predict(self, inputs):
-        #if len(inputs) != len(self._weights):
-        #    raise Exception('Wrong size of input vector')
-
-        #if (self._weights * inputs).sum() + self._bias >= 0:
-        if (self._weights.dot(inputs)).sum() + self._bias >= 0:
+        # predict value for provided inputs (that should be passed as np array)
+        if self._weights.dot(inputs) + self._bias >= 0:
             return 1
         else:
             return -1
 
-    def fit(self, X_train, y_train): #X_train need to be matrix
-        for i in range(X_train.shape[0]):
-            y_pred = self.predict(X_train[i, :])
-            self._weights += self._eta * X_train * (y_train[i] - y_pred)
-            self._bias += self._eta * (y_train[i] - y_pred)
-
-# after training should predict 1 if point is above line and 0 if it is below
-
-sn = SimplePerceptron(eta=0.01)
-
-# do it one by one instead of training all in one time for clean visualization sake
-for i in range(iterations):
-    sample = generate_sample(a, b)
-    X_train = np.array([sample[0:2]]).reshape((1, 2))
-    y_train = np.array([sample[2]]).reshape((1, 1))
-    sn.fit(X_train, y_train)
-    #if i % 10000 == 0:
-        #draw_plot(a, b, sn._weights[0], sn._bias)
-
-print('Params after training:')
-print(sn._weights, sn._bias)
+    def fit(self, X_train, y_train):
+        # trains perceptron from provided training data, X_train is a matrix of observations,
+        # while y_train is vector of correct result for each observation
+        for idx in range(X_train.shape[0]):
+            y_pred = self.predict(X_train[idx, :])
+            self._weights += self._eta * X_train * (y_train[idx] - y_pred)
+            self._bias += self._eta * (y_train[idx] - y_pred)
 
 
-def benchmark():
+def benchmark(lin_eq, predictor, n_tests=1000):
+    # tests trained predictor, lin_eq that predictor was trained against needs to
+    # be provided, tests quantity specified by n_tests
     errors = 0
-    for i in range(1000):
-        sample = generate_sample2(a, b) #some tests
-
-        if sample[2] != sn.predict(sample[:2]):
+    for i in range(n_tests):
+        sample = generate_sample(lin_eq)
+        if sample[2] != predictor.predict(sample[:2]):
             errors += 1
-    print(errors)
 
-benchmark()
+    return errors, errors / 1000
+
+
+def main():
+    # program solves easy classification problem: if point is above line defined by provided
+    # linear equation or below?
+
+    # actual linear equation coefficients
+    lin_eq = LinearEquation(a=2.3, b=-0.4)
+
+    # number of training iterations
+    iterations = 10 ** 5
+
+    sp = SimplePerceptron(eta=0.01)
+
+    for i in range(iterations):
+        sample = generate_sample(lin_eq)
+        X_train = np.array([sample[0:2]]).reshape((1, 2))
+        y_train = np.array([sample[2]]).reshape((1, 1))
+        sp.fit(X_train, y_train)
+        # if i % 10000 == 0:
+        # draw_plot(a, b, sn._weights[0], sn._bias)
+
+    errors, error_rate = benchmark(lin_eq, sp)
+    print('Total errors after training:', errors)
+    print('Error rate after training:', error_rate)
+    print('Accuracy: {}%'.format((1 - error_rate) * 100))
+
+main()
